@@ -52,3 +52,4 @@ function allowRoles(...roles: Role[]) {
 export const verifyRenter = allowRoles("customer");
 export const verifyOwner = allowRoles("owner");
 export const verifyAdmin = allowRoles("admin");
+export const verifyOwnerOrAdmin = allowRoles("owner", "admin");
