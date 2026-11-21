@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
 import { getDb } from "./db";
+import equipmentRouter from "./routes/equipment";
 import { errorHandler, notFound } from "./middleware/errors";
 import { verifyAdmin, verifyOwner, verifyRenter, verifyToken } from "./middleware/auth";
 export const app = express();
@@ -30,6 +31,6 @@ app.get("/api/test/owner", verifyToken, verifyOwner, (_req, res) => {
 app.get("/api/test/admin", verifyToken, verifyAdmin, (_req, res) => {
   res.json({ success: true, message: "Admin route OK" });
 });
-
+app.use("/api/equipment", equipmentRouter);
 app.use(notFound);
 app.use(errorHandler);
