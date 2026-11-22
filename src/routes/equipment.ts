@@ -92,6 +92,16 @@ router.get("/featured", async (_req, res) => {
   res.json({ success: true, data });
 });
 
+// GET /api/equipment/categories  (approved item count per category)
+router.get("/categories", async (_req, res) => {
+  const data = await (await equipment())
+    .aggregate([
+      { $match: { status: "approved" } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+    ])
+    .toArray();
+  res.json({ success: true, data });
+});
 // ---------- Owner ----------
 
 // GET /api/equipment/mine
