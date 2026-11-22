@@ -1,17 +1,48 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { env } from "./config/env";
 import { getDb } from "./db";
 import equipmentRouter from "./routes/equipment";
 import { errorHandler, notFound } from "./middleware/errors";
-import { verifyAdmin, verifyOwner, verifyRenter, verifyToken } from "./middleware/auth";
+import { verifyToken } from "./middleware/auth";
 import usersRouter from "./routes/users";
 import reviewsRouter from "./routes/reviews";
 
 export const app = express();
 
-app.use(cors({ origin: env.clientUrls, credentials: true }));
-app.use(express.json());
+// Behind a reverse proxy (Vercel/Render/nginx), set TRUST_PROXY so rate limiting
+// sees the real client IP. Leave unset when the app is directly exposed.
+if (process.env.TRUST_PROXY) {
+  app.set("trust proxy", Number(process.env.TRUST_PROXY) || 1);
+}
+
+app.disable("x-powered-by");
+app.use(helmet());
+app.use(
+  cors({
+    origin: env.clientUrls,
+    credentials: true,
+    maxAge: 86_400,
+  })
+);
+app.use(express.json({ limit: "100kb" }));
+
+// Rate-limit the API, and never let proxies/browsers cache API responses.
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 60_000,
+    limit: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
 app.get("/", (_req, res) => {
   res.json({ success: true, message: "RentNeo API is running" });
@@ -25,15 +56,7 @@ app.get("/api/health", async (_req, res) => {
 app.get("/api/me", verifyToken, (req, res) => {
   res.json({ success: true, user: req.user });
 });
-app.get("/api/test/renter", verifyToken, verifyRenter, (_req, res) => {
-  res.json({ success: true, message: "Renter route OK" });
-});
-app.get("/api/test/owner", verifyToken, verifyOwner, (_req, res) => {
-  res.json({ success: true, message: "Owner route OK" });
-});
-app.get("/api/test/admin", verifyToken, verifyAdmin, (_req, res) => {
-  res.json({ success: true, message: "Admin route OK" });
-});
+
 app.use("/api/equipment", equipmentRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/reviews", reviewsRouter);
