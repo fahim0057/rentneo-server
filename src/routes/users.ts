@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Document, type Filter } from "mongodb";
 import { z } from "zod";
 import { getDb } from "../db";
 import { AppError } from "../middleware/errors";
 import { verifyAdmin, verifyToken } from "../middleware/auth";
 import { parseBody } from "../lib/equipmentSchema";
-import { ObjectId, type Document, type Filter } from "mongodb";
+
 const router = Router();
 
 // Every route in this file is admin-only
@@ -26,9 +26,17 @@ router.get("/", async (_req, res) => {
 // PATCH /api/users/:id/role
 router.patch("/:id/role", async (req, res) => {
   const { role } = parseBody(roleSchema, req.body);
-  const idFilter: Filter<Document> = {
-    $or: [{ _id: new ObjectId(id) }, { _id: id as unknown as ObjectId }],
-  };
+  const id = req.params.id;
+
+  if (!id) throw new AppError(400, "Invalid user id");
+  if (id === req.user!.id) throw new AppError(400, "You cannot change your own role");
+
+  // Better Auth normally stores _id as an ObjectId; keep a string fallback in case
+  // the adapter is ever configured with custom ids.
+  const idFilter: Filter<Document> =
+    ObjectId.isValid(id) && /^[a-f\d]{24}$/i.test(id)
+      ? { _id: new ObjectId(id) }
+      : { _id: id as unknown as ObjectId };
 
   const result = await (await users()).findOneAndUpdate(
     idFilter,
