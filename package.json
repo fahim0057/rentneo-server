@@ -2,12 +2,15 @@
   "name": "rentneo-server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "seed:equipment": "tsx src/scripts/seed-equipment.ts",
+    "seed:reviews": "tsx src/scripts/seed-reviews.ts",
+    "indexes": "tsx src/scripts/ensure-indexes.ts"
   },
   "keywords": [],
   "type": "commonjs",
@@ -15,6 +18,8 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
+    "express-rate-limit": "^8.7.5",
+    "helmet": "^8.3.0",
     "jose": "^6.2.18",
     "mongodb": "^7.9.1",
     "stripe": "^23.2.0",
