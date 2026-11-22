@@ -8,7 +8,12 @@ import {
   verifyOwnerOrAdmin,
   verifyToken,
 } from "../middleware/auth";
-import { equipmentSchema, parseBody, statusSchema } from "../lib/equipmentSchema";
+import {
+  equipmentSchema,
+  parseBody,
+  statusSchema,
+  STATUSES,
+} from "../lib/equipmentSchema";
 
 const router = Router();
 const equipment = async () => (await getDb()).collection("equipment");
@@ -26,6 +31,15 @@ const str = (v: unknown): string | undefined =>
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// Public listings must not leak owner contact details or demo-only flags.
+const PUBLIC_PROJECTION = { ownerEmail: 0, seeded: 0 };
+
+// Accept only finite integers; anything else falls back to the default.
+const toInt = (v: unknown, fallback: number) => {
+  const n = Number(str(v));
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+};
+
 // ---------- Public ----------
 
 // GET /api/equipment?search=&category=&rentalType=&minPrice=&maxPrice=&availability=&sort=&page=&limit=
@@ -33,7 +47,10 @@ router.get("/", async (req, res) => {
   const q = req.query;
   const filter: Document = { status: "approved" };
 
-  const search = str(q.search);
+  // Strip control characters (MongoDB rejects regexes containing NUL) and cap length.
+  const search = str(q.search)
+    ?.replace(/[\u0000-\u001f\u007f]/g, "")
+    .slice(0, 100);
   if (search) {
     const rx = new RegExp(escapeRegex(search), "i");
     filter.$or = [{ name: rx }, { location: rx }, { category: rx }, { brand: rx }];
@@ -46,8 +63,13 @@ router.get("/", async (req, res) => {
   const price: Document = {};
   const min = Number(str(q.minPrice));
   const max = Number(str(q.maxPrice));
-  if (str(q.minPrice) && !Number.isNaN(min)) price.$gte = min;
-  if (str(q.maxPrice) && !Number.isNaN(max)) price.$lte = max;
+  const hasMin = Number.isFinite(min);
+  const hasMax = Number.isFinite(max);
+  if (hasMin && hasMax && min > max) {
+    throw new AppError(400, "minPrice cannot be greater than maxPrice");
+  }
+  if (hasMin) price.$gte = min;
+  if (hasMax) price.$lte = max;
   if (Object.keys(price).length) filter.rentalPrice = price;
 
   const availability = str(q.availability);
@@ -59,33 +81,37 @@ router.get("/", async (req, res) => {
     "price-desc": { rentalPrice: -1 },
     newest: { createdAt: -1 },
   };
-  const sortBy = sorts[str(q.sort) ?? "newest"] ?? sorts.newest;
+  const sortKey = str(q.sort);
+  const sortBy =
+    (sortKey && Object.hasOwn(sorts, sortKey) ? sorts[sortKey] : undefined) ?? sorts.newest;
 
-  const page = Math.max(1, Number(str(q.page)) || 1);
-  const limit = Math.min(50, Math.max(1, Number(str(q.limit)) || 9));
+  const requestedPage = Math.max(1, toInt(q.page, 1));
+  const limit = Math.min(50, Math.max(1, toInt(q.limit, 9)));
 
   const col = await equipment();
-  const [data, total] = await Promise.all([
-    col
-      .find(filter)
-      .sort({ ...sortBy, _id: -1 }) // _id keeps pagination order stable
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .toArray(),
-    col.countDocuments(filter),
-  ]);
+  const total = await col.countDocuments(filter);
+  const totalPages = Math.ceil(total / limit);
+  // Clamp deep links (e.g. ?page=99) to the last real page.
+  const page = totalPages > 0 ? Math.min(requestedPage, totalPages) : 1;
+
+  const data = await col
+    .find(filter, { projection: PUBLIC_PROJECTION })
+    .sort({ ...sortBy, _id: -1 }) // _id keeps pagination order stable
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .toArray();
 
   res.json({
     success: true,
     data,
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    pagination: { page, limit, total, totalPages },
   });
 });
 
 // GET /api/equipment/featured  (6 newest approved items)
 router.get("/featured", async (_req, res) => {
   const data = await (await equipment())
-    .find({ status: "approved" })
+    .find({ status: "approved" }, { projection: PUBLIC_PROJECTION })
     .sort({ createdAt: -1 })
     .limit(6)
     .toArray();
@@ -136,7 +162,12 @@ router.post("/", verifyToken, verifyOwner, async (req, res) => {
 router.get("/admin/all", verifyToken, verifyAdmin, async (req, res) => {
   const filter: Document = {};
   const status = str(req.query.status);
-  if (status) filter.status = status;
+  if (status) {
+    if (!STATUSES.includes(status as (typeof STATUSES)[number])) {
+      throw new AppError(400, "Invalid status filter");
+    }
+    filter.status = status;
+  }
   const data = await (await equipment()).find(filter).sort({ createdAt: -1 }).toArray();
   res.json({ success: true, data });
 });
@@ -158,10 +189,16 @@ router.patch("/:id/status", verifyToken, verifyAdmin, async (req, res) => {
 // GET /api/equipment/:id
 router.get("/:id", verifyToken, async (req, res) => {
   const doc = await (await equipment()).findOne({ _id: toObjectId(req.params.id) });
+  if (!doc) throw new AppError(404, "Equipment not found");
+
   const user = req.user!;
-  const canSee =
-    doc && (doc.status === "approved" || user.role === "admin" || doc.ownerId === user.id);
+  const canSee = doc.status === "approved" || user.role === "admin" || doc.ownerId === user.id;
   if (!canSee) throw new AppError(404, "Equipment not found");
+
+  // Only admins and the owner get the owner's contact email; nobody gets demo flags.
+  delete doc.seeded;
+  if (user.role !== "admin" && doc.ownerId !== user.id) delete doc.ownerEmail;
+
   res.json({ success: true, data: doc });
 });
 

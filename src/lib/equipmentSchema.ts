@@ -24,7 +24,7 @@ export const equipmentSchema = z.object({
   condition: z.enum(CONDITIONS),
   brand: z.string().trim().min(1).max(60),
   model: z.string().trim().min(1).max(60),
-  image: z.string().trim().url(),
+  image: z.string().trim().url({ protocol: /^https?$/ }),
   terms: z.string().trim().min(10).max(2000),
 });
 
