@@ -6,6 +6,8 @@ import equipmentRouter from "./routes/equipment";
 import { errorHandler, notFound } from "./middleware/errors";
 import { verifyAdmin, verifyOwner, verifyRenter, verifyToken } from "./middleware/auth";
 import usersRouter from "./routes/users";
+import reviewsRouter from "./routes/reviews";
+
 export const app = express();
 
 app.use(cors({ origin: env.clientUrls, credentials: true }));
@@ -34,5 +36,6 @@ app.get("/api/test/admin", verifyToken, verifyAdmin, (_req, res) => {
 });
 app.use("/api/equipment", equipmentRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/reviews", reviewsRouter);
 app.use(notFound);
 app.use(errorHandler);
