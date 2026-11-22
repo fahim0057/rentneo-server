@@ -11,6 +11,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      // Captured by the JSON body parser so Stripe can verify webhook signatures.
+      rawBody?: Buffer;
     }
   }
 }

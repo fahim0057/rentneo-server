@@ -9,7 +9,8 @@ import { errorHandler, notFound } from "./middleware/errors";
 import { verifyToken } from "./middleware/auth";
 import usersRouter from "./routes/users";
 import reviewsRouter from "./routes/reviews";
-
+import paymentsRouter from "./routes/payments";
+import favoritesRouter from "./routes/favorites";
 export const app = express();
 
 // Behind a reverse proxy (Vercel/Render/nginx), set TRUST_PROXY so rate limiting
@@ -60,5 +61,7 @@ app.get("/api/me", verifyToken, (req, res) => {
 app.use("/api/equipment", equipmentRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/reviews", reviewsRouter);
+app.use("/api/payments", paymentsRouter);
+app.use("/api/favorites", favoritesRouter);
 app.use(notFound);
 app.use(errorHandler);
