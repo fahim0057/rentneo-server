@@ -10,6 +10,8 @@ export const env = {
   port: Number(process.env.PORT) || 5000,
   authUrl: required("AUTH_URL").replace(/\/$/, ""),
   mongoUri: required("MONGODB_URI"),
+  mongoDb: process.env.MONGODB_DB?.trim() || "rentneo",
+  mongoTimeoutMs: Number(process.env.MONGODB_TIMEOUT_MS) || 10_000,
   // Comma-separated list, e.g. "http://localhost:3000,https://rentneo.vercel.app"
   clientUrls: required("CLIENT_URL").split(",").map((u) => u.trim()),
 };
