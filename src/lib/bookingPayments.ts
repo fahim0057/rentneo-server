@@ -63,18 +63,22 @@ export async function confirmBookingPayment(
 
   const now = new Date();
 
-  // Only move a booking forward. A late duplicate event must not turn a
+  // Record the money even if the booking was cancelled in the meantime, but only
+  // move a booking forward: a late or duplicate event must never turn a
   // completed or cancelled booking back into "confirmed".
   await bookings.updateOne(
     { _id, paymentStatus: { $ne: "paid" } },
     {
       $set: {
         paymentStatus: "paid",
-        bookingStatus: "confirmed",
         paidAt: now,
         updatedAt: now,
       },
     }
+  );
+  await bookings.updateOne(
+    { _id, bookingStatus: { $nin: ["cancelled", "completed"] } },
+    { $set: { bookingStatus: "confirmed", updatedAt: now } }
   );
   await bookings.updateOne({ _id }, { $set: { stripeSessionId: session.id } });
 

@@ -6,6 +6,7 @@ async function main() {
   const favorites = db.collection("favorites");
   const bookings = db.collection("bookings");
   const payments = db.collection("payments");
+  const reviews = db.collection("reviews");
 
   await Promise.all([
     equipment.createIndex({ status: 1, createdAt: -1 }),
@@ -22,9 +23,15 @@ async function main() {
     payments.createIndex({ stripeSessionId: 1 }, { unique: true }),
     payments.createIndex({ ownerId: 1, createdAt: -1 }),
     payments.createIndex({ status: 1, createdAt: -1 }),
+    reviews.createIndex({ equipmentId: 1, createdAt: -1 }),
+    reviews.createIndex({ userId: 1, createdAt: -1 }),
+    reviews.createIndex(
+      { bookingId: 1 },
+      { unique: true, partialFilterExpression: { bookingId: { $type: "string" } } }
+    ),
   ]);
 
-  console.log("Equipment, favorites, booking and payment indexes ensured.");
+  console.log("Equipment, favorites, booking, payment and review indexes ensured.");
   await closeDb();
 }
 

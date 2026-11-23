@@ -214,6 +214,43 @@ router.get("/admin", verifyToken, verifyAdmin, async (req, res) => {
   await sendPage(req, res, filter);
 });
 
+// POST /api/bookings/:id/cancel -> a renter can abandon an unpaid booking
+router.post("/:id/cancel", verifyToken, verifyRenter, async (req, res) => {
+  const _id = toObjectId(req.params.id, "booking id");
+  const col = await bookingsCol();
+
+  const booking = await col.findOne({ _id, customerId: req.user!.id });
+  if (!booking) throw new AppError(404, "Booking not found");
+  if (booking.bookingStatus !== "pending" || booking.paymentStatus !== "pending") {
+    throw new AppError(400, "Only unpaid bookings can be cancelled");
+  }
+
+  const result = await col.findOneAndUpdate(
+    { _id, bookingStatus: "pending", paymentStatus: "pending" },
+    {
+      $set: {
+        bookingStatus: "cancelled",
+        paymentStatus: "failed",
+        updatedAt: new Date(),
+      },
+    },
+    { returnDocument: "after" }
+  );
+  if (!result) throw new AppError(409, "This booking was just changed. Please refresh.");
+
+  // Close the Checkout Session so the renter cannot pay after cancelling.
+  // This is best-effort: an expired or completed session cannot be closed.
+  if (booking.stripeSessionId) {
+    try {
+      await getStripe().checkout.sessions.expire(booking.stripeSessionId);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  res.json({ success: true, data: result });
+});
+
 // PATCH /api/bookings/:id/status
 const TERMINAL = ["completed", "cancelled"];
 const OWNER_TRANSITIONS: Record<string, string[]> = {
