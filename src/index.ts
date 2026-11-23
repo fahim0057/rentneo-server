@@ -1,4 +1,4 @@
-import e from "express";
+
 import { app } from "./app";
 import { env } from "./config/env";
 import { closeDb, getDb } from "./db";
@@ -35,4 +35,3 @@ start().catch((err) => {
   console.error("Failed to start server:", err);
   process.exit(1);
 });
-export default app;

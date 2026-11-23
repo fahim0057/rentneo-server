@@ -78,3 +78,4 @@ app.use("/api/bookings", bookingsRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use(notFound);
 app.use(errorHandler);
+export default app;
