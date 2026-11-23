@@ -11,6 +11,8 @@ import usersRouter from "./routes/users";
 import reviewsRouter from "./routes/reviews";
 import paymentsRouter from "./routes/payments";
 import favoritesRouter from "./routes/favorites";
+import bookingsRouter from "./routes/bookings";
+import analyticsRouter from "./routes/analytics";
 export const app = express();
 
 // Behind a reverse proxy (Vercel/Render/nginx), set TRUST_PROXY so rate limiting
@@ -28,7 +30,16 @@ app.use(
     maxAge: 86_400,
   })
 );
-app.use(express.json({ limit: "100kb" }));
+// Keep the raw bytes as well: Stripe signs the exact body, and re-serialising
+// parsed JSON would break signature verification.
+app.use(
+  express.json({
+    limit: "100kb",
+    verify: (req, _res, buf) => {
+      (req as unknown as { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  })
+);
 
 // Rate-limit the API, and never let proxies/browsers cache API responses.
 app.use(
@@ -63,5 +74,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/reviews", reviewsRouter);
 app.use("/api/payments", paymentsRouter);
 app.use("/api/favorites", favoritesRouter);
+app.use("/api/bookings", bookingsRouter);
+app.use("/api/analytics", analyticsRouter);
 app.use(notFound);
 app.use(errorHandler);

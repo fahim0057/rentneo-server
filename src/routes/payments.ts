@@ -4,7 +4,7 @@ import { env } from "../config/env";
 import { AppError } from "../middleware/errors";
 import { verifyRenter, verifyToken } from "../middleware/auth";
 import { getStripe } from "../lib/stripe";
-import { confirmBookingPayment, expireBookingPayment } from "../lib/bookingPayments";
+import { confirmBookingPayment, expireBookingPayment, failBookingPayment } from "../lib/bookingPayments";
 
 const router = Router();
 
@@ -34,6 +34,11 @@ router.post("/webhook", async (req, res) => {
     case "checkout.session.async_payment_failed":
       await expireBookingPayment(event.data.object);
       break;
+    case "payment_intent.payment_failed": {
+      const intent = event.data.object;
+      await failBookingPayment(intent.metadata?.bookingId);
+      break;
+    }
     default:
       break; // events we don't care about are acknowledged and ignored
   }

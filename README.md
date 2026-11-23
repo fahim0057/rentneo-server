@@ -26,7 +26,7 @@ host and port, because the JWT `iss`/`aud` values are checked against it.
 | `CLIENT_URL` | Allowed CORS origin(s), comma-separated |
 | `AUTH_URL` | Better Auth origin used for JWKS + JWT issuer/audience |
 | `TRUST_PROXY` | Optional proxy hop count when behind a reverse proxy |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Reserved; payments not implemented yet |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe test-mode keys; leave blank to keep checkout disabled |
 
 ## Endpoints
 
@@ -52,12 +52,31 @@ Public equipment responses omit `ownerEmail` and demo flags.
 - `PATCH /api/equipment/:id/status` — admin
 - `GET /api/users` — admin
 - `PATCH /api/users/:id/role` — admin; cannot change your own role
+- `GET /api/favorites` — current user's favorited equipment
+- `POST /api/favorites/:equipmentId` — add a favorite
+- `DELETE /api/favorites/:equipmentId` — remove a favorite
+- `POST /api/bookings` — create a pending booking and Stripe Checkout Session
+- `GET /api/bookings/mine` — renter's bookings (`page`, `limit`)
+- `GET /api/bookings/owner` — owner's bookings (`page`, `limit`)
+- `GET /api/bookings/admin?bookingStatus=&paymentStatus=` — admin
+- `PATCH /api/bookings/:id/status` — owning owner or admin
+- `GET /api/payments/success?session_id=` — renter's paid-booking confirmation fallback
+- `GET /api/analytics/admin` — admin totals and 12-month activity
+- `GET /api/analytics/owner` — owner totals and 12-month earnings
+
+### Payments
+
+- `POST /api/payments/webhook` — Stripe signature-verified webhook (no JWT)
+
+All amounts are stored in **BDT** (`bdt` for Stripe). For local testing, run
+`stripe listen --forward-to localhost:5000/api/payments/webhook` and put the
+printed `whsec_...` value in `STRIPE_WEBHOOK_SECRET`.
 
 ## Scripts
 
 - `npm run dev` — tsx watch
 - `npm run build` — compile to `dist/`
 - `npm run start` — run the compiled server
-- `npm run indexes` — create equipment indexes
+- `npm run indexes` — create equipment, favorite, booking and payment indexes
 - `npm run seed:equipment` — demo listings (`--clear` to remove them)
 - `npm run seed:reviews` — demo reviews

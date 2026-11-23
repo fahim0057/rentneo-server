@@ -46,8 +46,8 @@ async function expireStaleHolds(extra: Document = {}) {
 }
 
 async function sendPage(req: Request, res: Response, filter: Document) {
-  const page = Math.max(1, Number(str(req.query.page)) || 1);
-  const limit = Math.min(50, Math.max(1, Number(str(req.query.limit)) || 10));
+  const page = Math.max(1, Math.trunc(Number(str(req.query.page)) || 1));
+  const limit = Math.min(50, Math.max(1, Math.trunc(Number(str(req.query.limit)) || 10)));
   const col = await bookingsCol();
   const [data, total] = await Promise.all([
     col
@@ -161,6 +161,11 @@ router.post("/", verifyToken, verifyRenter, async (req, res) => {
         customerId: user.id,
         ownerId: equipment.ownerId,
         equipmentId,
+      },
+      // Copy the booking id onto the PaymentIntent so card-failure events can
+      // be tied back to a booking without another lookup.
+      payment_intent_data: {
+        metadata: { bookingId: insertedId.toHexString() },
       },
       expires_at: Math.floor(Date.now() / 1000) + HOLD_MINUTES * 60,
       success_url: `${env.clientBaseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
